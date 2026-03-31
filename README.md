@@ -28,3 +28,27 @@ This library has ContactMatrixFacet as the main interaction point. It hides all 
 
 ## Building from source
 You can run `rebuild.sh` script in source directory which will perform static type-checking of module using mypy (it may produce error messages), build library from source and reinstall it, deleting current version.
+
+## JVM API client (v1)
+
+This branch also contains `hict_jvm_api`, a Python client for controlling a running `HiCT_JVM` backend.
+
+### Key capabilities
+* Open/attach/close sessions in HiCT_JVM;
+* Fetch Hi-C map regions as numpy RGBA arrays (`PNG_BY_PIXELS`) for ML pipelines;
+* Run scaffolding operations via API (reverse/move/split/group/ungroup/debris);
+* Run converter jobs (single and batch) and monitor status;
+* Link FASTA, export FASTA selections/assembly, import/export AGP;
+* Convert coordinates between BP/BINS/PIXELS with hidden-contig awareness.
+
+### Quick links
+* API docs: [`doc/jvm_api_v1.md`](./doc/jvm_api_v1.md)
+* Notebooks:
+  * [`notebooks/jvm_api_quickstart.ipynb`](./notebooks/jvm_api_quickstart.ipynb)
+  * [`notebooks/jvm_api_pytorch_dataloader.ipynb`](./notebooks/jvm_api_pytorch_dataloader.ipynb)
+
+### Tests
+* Unit tests (mocked HTTP transport):
+  * `./run_jvm_api_tests.sh`
+* Optional integration tests against a real running HiCT_JVM:
+  * `./run_jvm_api_optional_data_tests.sh`

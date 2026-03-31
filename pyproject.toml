@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel>=0.41"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hict-jvm-api"
+version = "0.1.0"
+description = "Python client for controlling HiCT_JVM and fetching Hi-C map regions"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "CT Lab ITMO University team" }
+]
+dependencies = [
+  "requests>=2.28",
+  "numpy>=1.23",
+  "Pillow>=9.5",
+]
+
+[project.optional-dependencies]
+torch = [
+  "torch>=2.0"
+]
+dev = [
+  "pytest>=7",
+  "mypy>=1.8",
+  "hypothesis>=6.61",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hict*", "hict_jvm_api*"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
