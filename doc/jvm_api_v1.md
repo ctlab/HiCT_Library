@@ -14,6 +14,8 @@
 - `hict.HiCTClient` / `hict_jvm_api.client.HiCTJVMClient`
   - session management (`open_file`, `attach_session`, `close_session`)
   - map region fetch (`fetch_region_pixels`, `fetch_tile_png`, `fetch_tile_with_ranges`)
+  - numeric matrix fetch (`fetch_region_signal`, `fetch_region_signal_torch`) with
+    `RAW_COUNTS`, `COOLER_WEIGHTED`, `TRADITIONAL_NORMALIZED`, `PIPELINE_SIGNAL`
   - scaffolding operations (`reverse_selection_range`, `move_selection_range`, `split_contig_at_bin`, etc.)
   - conversion jobs (`start_conversion_job`, `start_batch_conversion_jobs`, polling helpers)
   - FASTA/AGP operations (`link_fasta`, `export_fasta_for_selection`, `load_agp`)
@@ -22,6 +24,8 @@
     respecting hidden contigs via `contigPresenceAtResolution`.
 - `hict_jvm_api.dataloader.HiCTRegionDataset`
   - PyTorch-friendly random-access dataset fetching regions from a live session.
+- `hict_jvm_api.dataloader.HiCTSignalDataset`
+  - PyTorch/NumPy-friendly dataset fetching scalar matrix windows from `/matrix/query`.
 
 ## Installation
 
@@ -56,6 +60,17 @@ img = client.fetch_region_pixels(
 
 # Convert BP -> visible pixel coordinate
 px = client.convert_units(1_000_000, from_unit=Unit.BP, to_unit=Unit.PIXELS, bp_resolution=resolution)
+
+signal = client.fetch_region_signal(
+    start_row=0,
+    start_col=0,
+    rows=256,
+    cols=256,
+    bp_resolution=resolution,
+    unit=Unit.PIXELS,
+    signal_mode="TRADITIONAL_NORMALIZED",
+    dtype="float32",
+)
 ```
 
 ## Testing

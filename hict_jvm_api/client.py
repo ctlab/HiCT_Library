@@ -163,6 +163,51 @@ class HiCTJVMClient:
         return response.text
 
     @staticmethod
+    def _header_int(response: requests.Response, header_name: str, fallback: int = 0) -> int:
+        raw = response.headers.get(header_name)
+        if raw is None:
+            return int(fallback)
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return int(fallback)
+
+    @staticmethod
+    def _normalize_unit(unit: Union[Unit, str]) -> str:
+        if isinstance(unit, Unit):
+            return unit.value
+        value = str(unit).strip().upper()
+        if value in {"PX", "PIXEL", "PIXELS"}:
+            return Unit.PIXELS.value
+        if value in {"BIN", "BINS"}:
+            return Unit.BINS.value
+        if value in {"BP", "BASE_PAIRS", "BASEPAIR", "BASEPAIRS"}:
+            return Unit.BP.value
+        raise ValueError(f"Unsupported unit: {unit}")
+
+    @staticmethod
+    def _matrix_format_for_dtype(dtype: str) -> str:
+        normalized = str(dtype).strip().lower()
+        if normalized in {"float32", "f32"}:
+            return "BINARY_FLOAT32"
+        if normalized in {"float64", "double", "f64"}:
+            return "BINARY_FLOAT64"
+        if normalized in {"int64", "i64", "long"}:
+            return "BINARY_INT64"
+        raise ValueError(f"Unsupported matrix dtype '{dtype}'. Use float32, float64 or int64.")
+
+    @staticmethod
+    def _numpy_dtype_for_binary_format(binary_format: str) -> np.dtype:
+        normalized = binary_format.strip().upper()
+        if normalized == "BINARY_FLOAT32":
+            return np.dtype("<f4")
+        if normalized == "BINARY_FLOAT64":
+            return np.dtype("<f8")
+        if normalized == "BINARY_INT64":
+            return np.dtype("<i8")
+        raise ValueError(f"Unsupported matrix binary format '{binary_format}'")
+
+    @staticmethod
     def _decode_png_bytes(png_bytes: bytes) -> np.ndarray:
         with Image.open(BytesIO(png_bytes)) as image:
             rgba = image.convert("RGBA")
@@ -388,6 +433,83 @@ class HiCTJVMClient:
             bp_resolution=bp_resolution,
             version=version,
         )
+
+    def fetch_region_signal(
+        self,
+        *,
+        start_row: int,
+        start_col: int,
+        rows: int,
+        cols: int,
+        bp_resolution: int,
+        unit: Union[Unit, str] = Unit.PIXELS,
+        signal_mode: str = "TRADITIONAL_NORMALIZED",
+        dtype: str = "float32",
+    ) -> np.ndarray:
+        """Fetch numeric matrix region as a dense NumPy array.
+
+        This method uses ``POST /matrix/query`` with binary payload transfer
+        for performance-sensitive ML/data-loader workflows.
+        """
+        if rows <= 0 or cols <= 0:
+            raise ValueError("rows and cols must be positive")
+
+        normalized_unit = self._normalize_unit(unit)
+        binary_format = self._matrix_format_for_dtype(dtype)
+        payload: Dict[str, Any] = {
+            "bpResolution": int(bp_resolution),
+            "unit": normalized_unit,
+            "startRow": int(start_row),
+            "startCol": int(start_col),
+            "endRow": int(start_row) + int(rows),
+            "endCol": int(start_col) + int(cols),
+            "signalMode": str(signal_mode).strip().upper(),
+            "format": binary_format,
+        }
+        response = self._request("POST", "/matrix/query", payload=payload)
+        response_dtype = self._numpy_dtype_for_binary_format(binary_format)
+        rows_out = self._header_int(response, "x-hict-rows", rows)
+        cols_out = self._header_int(response, "x-hict-cols", cols)
+        data = np.frombuffer(response.content, dtype=response_dtype)
+        expected = int(rows_out) * int(cols_out)
+        if data.size != expected:
+            raise HiCTAPIError(
+                f"Unexpected matrix payload size: got {data.size}, expected {expected} "
+                f"for shape ({rows_out}, {cols_out})"
+            )
+        return data.reshape((rows_out, cols_out))
+
+    def fetch_region_signal_torch(
+        self,
+        *,
+        start_row: int,
+        start_col: int,
+        rows: int,
+        cols: int,
+        bp_resolution: int,
+        unit: Union[Unit, str] = Unit.PIXELS,
+        signal_mode: str = "TRADITIONAL_NORMALIZED",
+        dtype: str = "float32",
+    ):
+        """Fetch numeric matrix region as a ``torch.Tensor``."""
+        matrix = self.fetch_region_signal(
+            start_row=start_row,
+            start_col=start_col,
+            rows=rows,
+            cols=cols,
+            bp_resolution=bp_resolution,
+            unit=unit,
+            signal_mode=signal_mode,
+            dtype=dtype,
+        )
+        try:
+            import torch
+        except ImportError as exc:
+            raise RuntimeError(
+                "fetch_region_signal_torch requires torch to be installed. "
+                "Install optional dependency: pip install 'hict[torch]'"
+            ) from exc
+        return torch.from_numpy(np.ascontiguousarray(matrix))
 
     # -------------------------
     # Unit conversion utilities

@@ -48,6 +48,25 @@ def test_open_and_fetch_region(client: HiCTJVMClient) -> None:
     assert converter.convert(0, Unit.BP, Unit.BINS) == 0
 
 
+def test_open_and_fetch_numeric_signal_region(client: HiCTJVMClient) -> None:
+    if not DATASET_FILE:
+        pytest.skip("Set HICT_DATASET_FILE to run dataset integration tests")
+    opened = client.require_open_file_response()
+    coarse_resolution = opened.resolutions[0]
+
+    matrix = client.fetch_region_signal(
+        start_row=0,
+        start_col=0,
+        rows=32,
+        cols=32,
+        bp_resolution=coarse_resolution,
+        unit=Unit.PIXELS,
+        signal_mode="TRADITIONAL_NORMALIZED",
+        dtype="float32",
+    )
+    assert matrix.shape == (32, 32)
+
+
 def test_scaffolding_reverse_twice(client: HiCTJVMClient) -> None:
     if not DATASET_FILE:
         pytest.skip("Set HICT_DATASET_FILE to run dataset integration tests")

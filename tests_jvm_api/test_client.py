@@ -11,11 +11,20 @@ from hict_jvm_api.exceptions import HiCTAPIError
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int, *, json_payload: Any = None, text: str = "", content: bytes = b""):
+    def __init__(
+        self,
+        status_code: int,
+        *,
+        json_payload: Any = None,
+        text: str = "",
+        content: bytes = b"",
+        headers: Mapping[str, str] | None = None,
+    ):
         self.status_code = status_code
         self._json_payload = json_payload
         self.text = text if text else ("" if json_payload is not None else content.decode("utf-8", errors="ignore"))
         self.content = content
+        self.headers = dict(headers or {})
 
     def json(self) -> Any:
         if self._json_payload is None:
@@ -174,3 +183,60 @@ def test_openapi_spec_yaml_fetch() -> None:
     client = HiCTJVMClient("http://test", session=_FakeSession(handler))
     spec = client.openapi_spec_yaml()
     assert "openapi: 3.0.3" in spec
+
+
+def test_fetch_region_signal_binary_float32() -> None:
+    expected = np.array([[1.5, 2.5], [3.5, 4.5]], dtype="<f4")
+    payload_bytes = expected.tobytes(order="C")
+
+    def handler(method: str, path: str, params: Mapping[str, str], payload: Mapping[str, Any]) -> _FakeResponse:
+        if method == "POST" and path == "/matrix/query":
+            assert payload["format"] == "BINARY_FLOAT32"
+            assert payload["signalMode"] == "TRADITIONAL_NORMALIZED"
+            return _FakeResponse(
+                200,
+                content=payload_bytes,
+                headers={"x-hict-rows": "2", "x-hict-cols": "2"},
+            )
+        raise AssertionError(f"Unexpected request: {method} {path}")
+
+    client = HiCTJVMClient("http://test", session=_FakeSession(handler))
+    matrix = client.fetch_region_signal(
+        start_row=0,
+        start_col=0,
+        rows=2,
+        cols=2,
+        bp_resolution=50000,
+    )
+    assert matrix.shape == (2, 2)
+    np.testing.assert_allclose(matrix, expected.astype(np.float32))
+
+
+def test_fetch_region_signal_binary_int64() -> None:
+    expected = np.array([[1, 2], [3, 4]], dtype="<i8")
+    payload_bytes = expected.tobytes(order="C")
+
+    def handler(method: str, path: str, params: Mapping[str, str], payload: Mapping[str, Any]) -> _FakeResponse:
+        if method == "POST" and path == "/matrix/query":
+            assert payload["format"] == "BINARY_INT64"
+            assert payload["signalMode"] == "RAW_COUNTS"
+            return _FakeResponse(
+                200,
+                content=payload_bytes,
+                headers={"x-hict-rows": "2", "x-hict-cols": "2"},
+            )
+        raise AssertionError(f"Unexpected request: {method} {path}")
+
+    client = HiCTJVMClient("http://test", session=_FakeSession(handler))
+    matrix = client.fetch_region_signal(
+        start_row=0,
+        start_col=0,
+        rows=2,
+        cols=2,
+        bp_resolution=50000,
+        signal_mode="RAW_COUNTS",
+        dtype="int64",
+    )
+    assert matrix.shape == (2, 2)
+    assert matrix.dtype == np.int64
+    np.testing.assert_array_equal(matrix, expected.astype(np.int64))

@@ -39,6 +39,7 @@ Use `hict.HiCTClient` (alias of `hict_jvm_api.HiCTJVMClient`) as the default ent
 ### Key capabilities
 * Open/attach/close sessions in HiCT_JVM;
 * Fetch Hi-C map regions as numpy RGBA arrays (`PNG_BY_PIXELS`) for ML pipelines;
+* Fetch numeric submatrices directly as dense arrays/tensors (`/matrix/query`);
 * Run scaffolding operations via API (reverse/move/split/group/ungroup/debris);
 * Run converter jobs (single and batch) and monitor status;
 * Link FASTA, export FASTA selections/assembly, import/export AGP;
@@ -66,6 +67,16 @@ tile = client.fetch_region_pixels(
     bp_resolution=resolution,
 )
 px = client.convert_units(1_000_000, from_unit=Unit.BP, to_unit=Unit.PIXELS, bp_resolution=resolution)
+signal = client.fetch_region_signal(
+    start_row=0,
+    start_col=0,
+    rows=256,
+    cols=256,
+    bp_resolution=resolution,
+    unit=Unit.PIXELS,
+    signal_mode="TRADITIONAL_NORMALIZED",
+    dtype="float32",
+)
 ```
 
 ### Quick links

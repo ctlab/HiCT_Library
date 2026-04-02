@@ -10,7 +10,7 @@ from __future__ import annotations
 import warnings
 
 from hict_jvm_api.client import HiCTJVMClient
-from hict_jvm_api.dataloader import HiCTRegionDataset
+from hict_jvm_api.dataloader import HiCTRegionDataset, HiCTSignalDataset
 from hict_jvm_api.exceptions import HiCTAPIError, HiCTClientStateError, HiddenCoordinateError
 from hict_jvm_api.models import (
     AssemblyInfo,
@@ -30,6 +30,7 @@ __all__ = [
     "HiCTClient",
     "HiCTJVMClient",
     "HiCTRegionDataset",
+    "HiCTSignalDataset",
     "HiCTAPIError",
     "HiCTClientStateError",
     "HiddenCoordinateError",
@@ -54,4 +55,3 @@ def _warn_legacy_import(path: str) -> None:
         category=DeprecationWarning,
         stacklevel=2,
     )
-
