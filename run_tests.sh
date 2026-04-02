@@ -28,4 +28,13 @@ HICT_DIR="$SCRIPT_DIR/../HiCT_Library/"
 export PYTHONPATH="$PYTHONPATH:$HICT_DIR"
 TESTS_DIR="$HICT_DIR/tests/"
 JVM_API_TESTS_DIR="$HICT_DIR/tests_jvm_api/"
-pytest -vvv -x -n16 "$TESTS_DIR" "$JVM_API_TESTS_DIR" -m "not integration"
+if pytest --help 2>/dev/null | grep -q -- "-n NUM"; then
+  PYTEST_PARALLEL_ARGS=(-n auto)
+else
+  PYTEST_PARALLEL_ARGS=()
+fi
+if [[ "${HICT_RUN_LEGACY_TESTS:-0}" == "1" ]]; then
+  pytest -vvv -x "${PYTEST_PARALLEL_ARGS[@]}" "$TESTS_DIR" "$JVM_API_TESTS_DIR" -m "not integration"
+else
+  pytest -vvv -x "${PYTEST_PARALLEL_ARGS[@]}" "$JVM_API_TESTS_DIR" -m "not integration"
+fi

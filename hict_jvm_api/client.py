@@ -10,6 +10,8 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Union
 import numpy as np
 import requests
 from PIL import Image
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 from .exceptions import HiCTAPIError, HiCTClientStateError
 from .models import OpenFileResponse, SecondarySourceStatus, TileRanges, TileWithRanges, Unit
@@ -27,15 +29,60 @@ class HiCTJVMClient:
         self,
         base_url: str,
         timeout: float = 30.0,
-        session: Optional[Any] = None,
+        session: Optional[requests.Session] = None,
+        *,
+        pool_maxsize: int = 64,
+        max_retries: int = 2,
+        retry_backoff_sec: float = 0.2,
     ):
         if not base_url:
             raise ValueError("base_url must be provided")
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._own_session = session is None
-        self._http = session if session is not None else requests.Session()
+        if session is not None:
+            self._http = session
+        else:
+            self._http = self._create_default_session(
+                pool_maxsize=int(max(1, pool_maxsize)),
+                max_retries=int(max(0, max_retries)),
+                retry_backoff_sec=float(max(0.0, retry_backoff_sec)),
+            )
         self._open_file_response: Optional[OpenFileResponse] = None
+
+    @staticmethod
+    def _create_default_session(
+        *,
+        pool_maxsize: int,
+        max_retries: int,
+        retry_backoff_sec: float,
+    ) -> requests.Session:
+        session = requests.Session()
+        retries = Retry(
+            total=max_retries,
+            connect=max_retries,
+            read=max_retries,
+            status=max_retries,
+            backoff_factor=retry_backoff_sec,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({"GET", "POST"}),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(
+            max_retries=retries,
+            pool_connections=pool_maxsize,
+            pool_maxsize=pool_maxsize,
+        )
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        session.headers.update(
+            {
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate",
+                "User-Agent": "hict-python/1 (jvm-api)",
+            }
+        )
+        return session
 
     def close(self) -> None:
         """Close the underlying HTTP session if owned by this client."""
@@ -68,13 +115,17 @@ class HiCTJVMClient:
         params: Optional[Mapping[str, Any]] = None,
         payload: Optional[Mapping[str, Any]] = None,
     ) -> requests.Response:
-        response = self._http.request(
-            method,
-            self._url(path),
-            params=dict(params or {}),
-            json=dict(payload or {}),
-            timeout=self.timeout,
-        )
+        method_upper = method.upper()
+        resolved_params = dict(params or {})
+        resolved_payload = dict(payload or {})
+        request_kwargs: Dict[str, Any] = {
+            "method": method_upper,
+            "url": self._url(path),
+            "params": resolved_params,
+            "json": resolved_payload,
+            "timeout": self.timeout,
+        }
+        response = self._http.request(**request_kwargs)
         if response.status_code >= 400:
             message = response.text
             parsed_payload: Any = None
@@ -140,6 +191,10 @@ class HiCTJVMClient:
         """Get HiCT_JVM version payload from ``GET /version``."""
         payload = self._request_json("GET", "/version")
         return payload
+
+    def openapi_spec_yaml(self) -> str:
+        """Get backend OpenAPI v1 YAML from ``GET /api/v1/openapi.yaml``."""
+        return self._request_text("GET", "/api/v1/openapi.yaml")
 
     def list_files(self) -> Sequence[str]:
         payload = self._request_json("POST", "/list_files", payload={})

@@ -163,3 +163,14 @@ def test_api_error_payload_raises_exception() -> None:
         assert False, "Expected HiCTAPIError"
     except HiCTAPIError as err:
         assert "Something failed" in str(err)
+
+
+def test_openapi_spec_yaml_fetch() -> None:
+    def handler(method: str, path: str, params: Mapping[str, str], payload: Mapping[str, Any]) -> _FakeResponse:
+        if method == "GET" and path == "/api/v1/openapi.yaml":
+            return _FakeResponse(200, text="openapi: 3.0.3\npaths: {}\n")
+        raise AssertionError(f"Unexpected request: {method} {path}")
+
+    client = HiCTJVMClient("http://test", session=_FakeSession(handler))
+    spec = client.openapi_spec_yaml()
+    assert "openapi: 3.0.3" in spec

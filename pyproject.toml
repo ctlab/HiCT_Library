@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel>=0.41"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hict-jvm-api"
-version = "0.1.0"
-description = "Python client for controlling HiCT_JVM and fetching Hi-C map regions"
+name = "hict"
+version = "1.0.0b1"
+description = "HiCT Python client powered by HiCT_JVM API"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

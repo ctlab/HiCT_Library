@@ -1,6 +1,7 @@
 # HiCT JVM API v1 Python Library
 
-`hict_jvm_api` is a Python package that uses a running `HiCT_JVM` server as the execution backend.
+`hict` now defaults to a JVM-backed API client (`hict.HiCTClient`) that uses a running
+`HiCT_JVM` server as the execution backend.
 
 ## Design goals
 
@@ -10,7 +11,7 @@
 
 ## Main classes
 
-- `hict_jvm_api.client.HiCTJVMClient`
+- `hict.HiCTClient` / `hict_jvm_api.client.HiCTJVMClient`
   - session management (`open_file`, `attach_session`, `close_session`)
   - map region fetch (`fetch_region_pixels`, `fetch_tile_png`, `fetch_tile_with_ranges`)
   - scaffolding operations (`reverse_selection_range`, `move_selection_range`, `split_contig_at_bin`, etc.)
@@ -39,9 +40,9 @@ pip install -e '.[torch]'
 ## Quick start
 
 ```python
-from hict_jvm_api import HiCTJVMClient, Unit
+from hict import HiCTClient, Unit
 
-client = HiCTJVMClient("http://localhost:5001")
+client = HiCTClient("http://localhost:5001")
 open_resp = client.open_file("build/quad/combined_ind2_4DN.hict.hdf5")
 
 resolution = open_resp.resolutions[0]  # coarse level
@@ -83,3 +84,9 @@ See:
 
 - `notebooks/jvm_api_quickstart.ipynb`
 - `notebooks/jvm_api_pytorch_dataloader.ipynb`
+
+## OpenAPI docs endpoint
+
+When `HiCT_JVM` is running, interactive API documentation is available at:
+
+- `http://localhost:5000/api/v1/`
