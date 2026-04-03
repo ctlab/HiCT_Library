@@ -1,6 +1,7 @@
-# HiCT library for interactive manual scaffolding using Hi-C contact maps
+# HiCT Python library (JVM API-first)
 
-**Note**: this version is preliminary but provides an overview of essential implementation details for HiCT model.
+This repository now provides a JVM-backed Python API as the primary and maintained interface.
+Heavy operations are executed in `HiCT_JVM`; Python acts as a fast typed client layer.
 
 ## Overview
 
@@ -24,7 +25,68 @@ It is recommended to use virtual environments provided by `venv` module to simpl
 This library uses HiCT format for the HiC data and you can convert Cooler's `.cool` or `.mcool` files to it using [HiCT utils](https://github.com/ctlab/HiCT_Utils)
 
 ## Documentation
-This library has ContactMatrixFacet as the main interaction point. It hides all the internal methods, exposing only simple ones. Documentation for this module could be found at [doc directory](https://github.com/ctlab/HiCT/blob/master/doc/hict.api.ContactMatrixFacet.html) (download this file and open it using your web browser).
+- JVM API client docs: [`doc/jvm_api_v1.md`](./doc/jvm_api_v1.md)
+- Legacy `ContactMatrixFacet` docs (compatibility only):
+  [`doc/hict.api.ContactMatrixFacet.html`](./doc/hict.api.ContactMatrixFacet.html)
 
 ## Building from source
 You can run `rebuild.sh` script in source directory which will perform static type-checking of module using mypy (it may produce error messages), build library from source and reinstall it, deleting current version.
+
+## JVM API client (v1)
+
+Use `hict.HiCTClient` (alias of `hict_jvm_api.HiCTJVMClient`) as the default entry point.
+
+### Key capabilities
+* Open/attach/close sessions in HiCT_JVM;
+* Fetch Hi-C map regions as numpy RGBA arrays (`PNG_BY_PIXELS`) for ML pipelines;
+* Fetch numeric submatrices directly as dense arrays/tensors (`/matrix/query`);
+* Run scaffolding operations via API (reverse/move/split/group/ungroup/debris);
+* Run converter jobs (single and batch) and monitor status;
+* Link FASTA, export FASTA selections/assembly, import/export AGP;
+* Convert coordinates between BP/BINS/PIXELS with hidden-contig awareness.
+
+### Install
+
+```bash
+pip install -e .
+```
+
+### Quick start
+
+```python
+from hict import HiCTClient, Unit
+
+client = HiCTClient("http://localhost:5000")
+session = client.open_file("build/quad/combined_ind2_4DN.hict.hdf5")
+resolution = session.resolutions[0]
+tile = client.fetch_region_pixels(
+    start_row_px=0,
+    start_col_px=0,
+    rows=256,
+    cols=256,
+    bp_resolution=resolution,
+)
+px = client.convert_units(1_000_000, from_unit=Unit.BP, to_unit=Unit.PIXELS, bp_resolution=resolution)
+signal = client.fetch_region_signal(
+    start_row=0,
+    start_col=0,
+    rows=256,
+    cols=256,
+    bp_resolution=resolution,
+    unit=Unit.PIXELS,
+    signal_mode="TRADITIONAL_NORMALIZED",
+    dtype="float32",
+)
+```
+
+### Quick links
+* API docs: [`doc/jvm_api_v1.md`](./doc/jvm_api_v1.md)
+* Notebooks:
+  * [`notebooks/jvm_api_quickstart.ipynb`](./notebooks/jvm_api_quickstart.ipynb)
+  * [`notebooks/jvm_api_pytorch_dataloader.ipynb`](./notebooks/jvm_api_pytorch_dataloader.ipynb)
+
+### Tests
+* Unit tests (mocked HTTP transport):
+  * `./run_jvm_api_tests.sh`
+* Optional integration tests against a real running HiCT_JVM:
+  * `./run_jvm_api_optional_data_tests.sh`

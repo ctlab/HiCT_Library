@@ -1,33 +1,57 @@
-#  MIT License
-#
-#  Copyright (c) 2021-2026. Aleksandr Serdiukov, Anton Zamyatin, Aleksandr Sinitsyn, Vitalii Dravgelis and Computer Technologies Laboratory ITMO University team.
-#
-#  Permission is hereby granted, free of charge, to any person obtaining a copy
-#  of this software and associated documentation files (the "Software"), to deal
-#  in the Software without restriction, including without limitation the rights
-#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#  copies of the Software, and to permit persons to whom the Software is
-#  furnished to do so, subject to the following conditions:
-#
-#  The above copyright notice and this permission notice shall be included in all
-#  copies or substantial portions of the Software.
-#
-#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#  SOFTWARE.
+"""HiCT Python API facade.
 
-#  MIT License
-#
-#
-#  Permission is hereby granted, free of charge, to any person obtaining a copy
-#  of this software and associated documentation files (the "Software"), to deal
-#  in the Software without restriction, including without limitation the rights
-#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#  copies of the Software, and to permit persons to whom the Software is
-#  furnished to do so, subject to the following conditions:
-#
-#
+This package now defaults to the JVM-backed API client for production usage.
+Legacy pure-Python modules remain importable from their original subpackages,
+but new code should use :class:`HiCTClient`.
+"""
+
+from __future__ import annotations
+
+import warnings
+
+from hict_jvm_api.client import HiCTJVMClient
+from hict_jvm_api.dataloader import HiCTRegionDataset, HiCTSignalDataset
+from hict_jvm_api.exceptions import HiCTAPIError, HiCTClientStateError, HiddenCoordinateError
+from hict_jvm_api.models import (
+    AssemblyInfo,
+    ContigDescriptor,
+    OpenFileResponse,
+    ScaffoldDescriptor,
+    TileRanges,
+    TileWithRanges,
+    Unit,
+)
+from hict_jvm_api.units import UnitConverter
+
+# Backward-compatible alias for the primary entrypoint.
+HiCTClient = HiCTJVMClient
+
+__all__ = [
+    "HiCTClient",
+    "HiCTJVMClient",
+    "HiCTRegionDataset",
+    "HiCTSignalDataset",
+    "HiCTAPIError",
+    "HiCTClientStateError",
+    "HiddenCoordinateError",
+    "AssemblyInfo",
+    "ContigDescriptor",
+    "OpenFileResponse",
+    "ScaffoldDescriptor",
+    "TileRanges",
+    "TileWithRanges",
+    "Unit",
+    "UnitConverter",
+]
+
+
+def _warn_legacy_import(path: str) -> None:
+    warnings.warn(
+        (
+            f"The legacy pure-Python API module '{path}' is kept for compatibility "
+            "but is no longer the recommended API. Use 'hict.HiCTClient' "
+            "(JVM-backed) for maintained functionality."
+        ),
+        category=DeprecationWarning,
+        stacklevel=2,
+    )
