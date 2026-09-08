@@ -1166,7 +1166,7 @@ class ChunkedFile(object):
     def get_fasta_for_range(
             self, from_bp_incl: np.int64, to_bp_excl: np.int64,
             buf: BytesIO,
-            intercontig_spacer: str = 500 * 'N'
+            intercontig_spacer: Optional[str] = None
     ) -> None:
         assert (
             (self.state == ChunkedFile.FileState.OPENED) 
@@ -1489,8 +1489,3 @@ class ChunkedFile(object):
 
         with contig_tree.root_lock.gen_rlock(), scaffold_tree.root_lock.gen_rlock():
             return self.get_ordered_contigs(), self.get_ordered_scaffolds()
-                
-            
-            
-        
-        

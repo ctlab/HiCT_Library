@@ -34,6 +34,7 @@
 from typing import Tuple, NamedTuple, List, Dict, Optional, Union
 from hict.core.common import ContigDescriptor, ContigDirection, ScaffoldBordersBP, ScaffoldDescriptor
 import numpy as np
+from hict.core.assembly_export_settings import output_gap_length_bp
 
 
 class AGPScaffoldRecord(NamedTuple):
@@ -60,10 +61,10 @@ class AGPparser(object):
 
     def parseAGPLine(self, line: str) -> Tuple[str, str, str, int, int]:
         toks: List[str] = line.split()
-        if toks[4] == 'N':
+        if toks[4] in ('N', 'U'):
             gap_len: str = toks[5]
             return ('N_spacer', gap_len, '', 0, 0)
-        elif toks[4] == 'W':
+        elif toks[4] in ('A', 'D', 'F', 'G', 'O', 'P', 'W'):
             seq_object_name: str = toks[0]
             component_name: str = toks[5]
             component_direction: str = toks[8]
@@ -76,6 +77,7 @@ class AGPparser(object):
 
     def parseAGP(self, filename) -> None:
         with open(filename, 'r') as agp_file:
+            cur_scaf_name = None
             scaf_name: str
             cur_scaf_name: str
             start_ctg: str
@@ -85,18 +87,19 @@ class AGPparser(object):
             ctg_start_position: int
             ctg_end_position: int
             for i, line in enumerate(agp_file):
+                if not line.strip() or line.lstrip().startswith('#'):
+                    continue
                 scaf_name, ctg_name, ctg_dir_str, ctg_start_position, ctg_end_position = self.parseAGPLine(line)
                 if scaf_name == 'N_spacer':
                     continue
-                if ctg_dir_str not in ("+", "-"):
+                if ctg_dir_str not in ("+", "-", "?", "0", "na"):
                     raise RuntimeError(
-                        f'unexpected symbol in agp direction column: {ctg_dir}'
+                        f'unexpected symbol in agp direction column: {ctg_dir_str}'
                     )
-                ctg_dir = ContigDirection(
-                    1) if ctg_dir_str == '+' else ContigDirection(0)
+                ctg_dir = ContigDirection.REVERSED if ctg_dir_str == '-' else ContigDirection.FORWARD
                 self.contig_records_list.append(
                     AGPContigRecord(ctg_name, ctg_dir, ctg_start_position, ctg_end_position))
-                if i == 0:
+                if cur_scaf_name is None:
                     cur_scaf_name = scaf_name
                     start_ctg = ctg_name
                     end_ctg = ctg_name
@@ -109,8 +112,9 @@ class AGPparser(object):
                         cur_scaf_name = scaf_name
                         start_ctg = ctg_name
                         end_ctg = ctg_name
-            self.scaffold_records_list.append(
-                AGPScaffoldRecord(cur_scaf_name, start_ctg, end_ctg))
+            if cur_scaf_name is not None:
+                self.scaffold_records_list.append(
+                    AGPScaffoldRecord(cur_scaf_name, start_ctg, end_ctg))
 
     def getAGPContigRecords(self) -> List[AGPContigRecord]:
         return self.contig_records_list
@@ -132,8 +136,9 @@ class AGPExporter(object):
             ]
         ],
         scaffold_list: List[Tuple[ScaffoldDescriptor, ScaffoldBordersBP]],
-        intercontig_spacer: str = 500*'N'
+        intercontig_spacer: Optional[str] = None
     ) -> None:
+        gap_length = output_gap_length_bp() if intercontig_spacer is None else len(intercontig_spacer)
         agpString: str = ""
         prev_scaffold: str = ""
         prev_end: np.int64 = 0
@@ -163,7 +168,7 @@ class AGPExporter(object):
                 0)]
             dir_cond: bool = contig_direction == ContigDirection.FORWARD
             contig_direction_str = "+" if dir_cond else "-"
-            if current_scaffold == prev_scaffold:
+            if current_scaffold == prev_scaffold and gap_length > 0:
                 component_id += 1
                 agpString += "\t".join(
                     map(
@@ -172,34 +177,38 @@ class AGPExporter(object):
                             current_scaffold,
                             prev_end + 1,
                             prev_end +
-                            len(intercontig_spacer),
+                            gap_length,
                             component_id,
-                            "N", len(intercontig_spacer),
+                            "N", gap_length,
                             "scaffold", "yes",
                             "proximity_ligation"
                         ]
                     )
                 )
-                prev_end = prev_end + len(intercontig_spacer) - 1
+                prev_end += gap_length
                 agpString += '\n'
                 component_id += 1
-            else:
+            elif current_scaffold != prev_scaffold:
                 component_id = 1
+                prev_end = 0
+            else:
+                component_id += 1
             agpString += "\t".join(
                 map(
                     lambda e: str(e),
                     (
                         current_scaffold,
                         prev_end + 1,
-                        prev_end + contig_length_bp - 1,
+                        prev_end + contig_length_bp,
                         component_id,
                         "W", contig_name,
-                        1, contig_length_bp,
+                        1 + contig.offset_inside_fasta_contig,
+                        contig.offset_inside_fasta_contig + contig_length_bp,
                         contig_direction_str
                     )
                 )
             )
-            prev_end = prev_end + contig_length_bp - 1
+            prev_end += contig_length_bp
             prev_scaffold = current_scaffold
             agpString += '\n'
             position_bp += contig_length_bp

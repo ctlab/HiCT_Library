@@ -38,6 +38,7 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
 from hict.core.common import ContigDirection, ScaffoldDescriptor, ContigDescriptor, FinalizeRecordType
+from hict.core.assembly_export_settings import output_gap_length_bp
 
 
 class FASTAProcessor(object):
@@ -63,8 +64,10 @@ class FASTAProcessor(object):
             out_fasta_header: str,
             offset_from_start_bp: int = 0,
             offset_from_end_bp: int = 0,
-            intercontig_spacer: str = 500*'N',
+            intercontig_spacer: Optional[str] = None,
     ) -> None:
+        if intercontig_spacer is None:
+            intercontig_spacer = 'N' * output_gap_length_bp()
         out_sequence_list: List[str] = list()
         last_ctg_order: int = len(ctg_list) - 1
         for ctg_order, (ctg, ctg_dir) in enumerate(ctg_list):
@@ -95,8 +98,15 @@ class FASTAProcessor(object):
         offset_before_end: int = 0
     ) -> str:
         base_dna_seq = self.records[ctg.contig_name_in_source_fasta]
-        contig_dna_seq = base_dna_seq[ctg.offset_inside_fasta_contig:(
-            ctg.offset_inside_fasta_contig+ctg.contig_length_at_resolution[0])]
+        source_start = int(ctg.offset_inside_fasta_contig)
+        contig_length = int(ctg.contig_length_at_resolution[0])
+        source_end = source_start + contig_length
+        if source_start < 0 or source_end > len(base_dna_seq):
+            raise ValueError(f"FASTA sequence {ctg.contig_name_in_source_fasta!r} does not cover "
+                             f"the requested interval [{source_start}, {source_end})")
+        if offset_from_start < 0 or offset_before_end < 0 or offset_from_start + offset_before_end > contig_length:
+            raise ValueError("FASTA crop offsets are outside the contig")
+        contig_dna_seq = base_dna_seq[source_start:source_end]
         if ctg_dir == ContigDirection.FORWARD:
             return str(contig_dna_seq[offset_from_start: (-offset_before_end if (offset_before_end > 0) else None)].seq)
         elif ctg_dir == ContigDirection.REVERSED:
@@ -121,7 +131,7 @@ class FASTAProcessor(object):
                 ordered_contig_descriptors[0][1]
             )
         else:
-            spacer_str: str = 'N' * scaffold_descriptor.spacer_length
+            spacer_str: str = 'N' * output_gap_length_bp()
             return spacer_str.join(
                 self.get_cropped_dna_string_for_single_contig(
                     ctg_descr,
